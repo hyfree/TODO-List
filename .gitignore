@@ -1,0 +1,16 @@
+# Backup files
+*.bak
+*.pyc
+__pycache__/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
