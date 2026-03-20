@@ -1153,10 +1153,31 @@
 <body>
     <div class="app-container">
         <!-- 侧边栏 -->
+        <!-- 登录框 -->
+        <div id="loginOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:16px;padding:32px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="text-align:center;margin-bottom:24px;">
+                    <div style="font-size:2em;margin-bottom:8px;">🎯</div>
+                    <div style="font-size:1.25em;font-weight:700;color:#1A1A2E;">任务指挥中心</div>
+                    <div style="font-size:0.875em;color:#6B7280;margin-top:4px;">请登录以继续</div>
+                </div>
+                <div id="loginError" style="display:none;background:#FEE2E2;color:#DC2626;padding:10px 14px;border-radius:8px;font-size:0.875em;margin-bottom:16px;"></div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-size:0.875em;font-weight:600;color:#374151;margin-bottom:6px;">用户名 (Owner)</label>
+                    <input id="loginOwner" type="text" placeholder="例如：wangcai" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:0.9em;outline:none;box-sizing:border-box;" />
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block;font-size:0.875em;font-weight:600;color:#374151;margin-bottom:6px;">已有 Token（可选）</label>
+                    <input id="loginToken" type="password" placeholder="留空则自动生成新 Token" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:0.9em;outline:none;box-sizing:border-box;" />
+                </div>
+                <button onclick="doLogin()" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:0.95em;font-weight:600;cursor:pointer;">🔑 登录 / 获取 Token</button>
+            </div>
+        </div>
+
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title">🎯 任务指挥中心</div>
-                <div class="sidebar-subtitle">Task Command Center</div>
+                <div class="sidebar-subtitle" id="sidebarOwnerLabel">Task Command Center</div>
             </div>
             
             <nav class="sidebar-nav">
@@ -1172,9 +1193,9 @@
                     <span class="nav-icon">📝</span>
                     <span>操作日志</span>
                 </div>
-                <div class="nav-item">
+                <div class="nav-item" onclick="showTokenPanel()">
                     <span class="nav-icon">⚙️</span>
-                    <span>系统设置</span>
+                    <span>账户 / Token</span>
                 </div>
             </nav>
             
@@ -1808,7 +1829,7 @@
         // ── 功能4：加载标签 datalist ──
         async function loadTags() {
             try {
-                const res = await fetch(`${API_BASE}/api/tasks/tags`);
+                const res = await apiFetch(`${API_BASE}/api/tasks/tags`);
                 const data = await res.json();
                 if (data.success) {
                     const dl = document.getElementById('tag-options');
@@ -1837,21 +1858,21 @@
             updateBatchBar();
         }
         async function batchComplete() {
-            for (const id of selectedTaskIds) await fetch(`${API_BASE}/api/tasks/${id}/complete`, {method:'POST'});
+            for (const id of selectedTaskIds) await apiFetch(`${API_BASE}/api/tasks/${id}/complete`, {method:'POST'});
             clearSelection(); loadTasks(); showNotification(`✅ 已完成 ${selectedTaskIds.size || '所选'} 项`);
         }
         async function batchCancel() {
-            for (const id of selectedTaskIds) await fetch(`${API_BASE}/api/tasks/${id}/cancel`, {method:'POST'});
+            for (const id of selectedTaskIds) await apiFetch(`${API_BASE}/api/tasks/${id}/cancel`, {method:'POST'});
             clearSelection(); loadTasks(); showNotification('↩️ 已取消所选任务');
         }
         async function batchPriority(p) {
-            for (const id of selectedTaskIds) await fetch(`${API_BASE}/api/tasks/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task:{priority:p}})});
+            for (const id of selectedTaskIds) await apiFetch(`${API_BASE}/api/tasks/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task:{priority:p}})});
             clearSelection(); loadTasks(); showNotification(`优先级已设为 ${p}`);
         }
         async function batchDelete() {
             if (!confirm(`确定删除选中的 ${selectedTaskIds.size} 个任务？`)) return;
             const ids = [...selectedTaskIds];
-            await fetch(`${API_BASE}/api/tasks/batch`, {method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids})});
+            await apiFetch(`${API_BASE}/api/tasks/batch`, {method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids})});
             clearSelection(); loadTasks(); showNotification('🗑️ 已删除所选任务');
         }
 
@@ -1860,7 +1881,7 @@
             const text = inputEl.value.trim();
             if (!text) return;
             try {
-                const res = await fetch(`${API_BASE}/api/tasks/${taskId}/notes`, {
+                const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/notes`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({author: 'wangcai', text})
@@ -1950,7 +1971,7 @@
             };
             
             try {
-                const response = await fetch(`${API_BASE}/api/todos`, {
+                const response = await apiFetch(`${API_BASE}/api/todos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task })
@@ -2048,7 +2069,7 @@
             };
             
             try {
-                const response = await fetch(`${API_BASE}/api/todos/${updatedTask.id}`, {
+                const response = await apiFetch(`${API_BASE}/api/todos/${updatedTask.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task: updatedTask })
@@ -2079,7 +2100,7 @@
         
         async function loadTasks() {
             try {
-                const response = await fetch(`${API_BASE}/api/todos?_t=${Date.now()}`);
+                const response = await apiFetch(`${API_BASE}/api/todos?_t=${Date.now()}`);
                 const data = await response.json();
                 if (data.success) {
                     allTasksCache = data.tasks;
@@ -2314,7 +2335,7 @@
                 }
                 
                 try {
-                    const response = await fetch(`${API_BASE}/api/todos/${taskId}`, {
+                    const response = await apiFetch(`${API_BASE}/api/todos/${taskId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ task: task })
@@ -2357,7 +2378,7 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+                const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}`, {
                     method: 'DELETE'
                 });
                 
@@ -2378,19 +2399,19 @@
         
         // ── 任务生命周期 API ──
         async function claimTask(taskId) {
-            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/claim`, {method:'POST'});
+            const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/claim`, {method:'POST'});
             const d = await res.json();
             if (d.success) { loadTasks(); showNotification('🙋 已领取任务'); }
             else showNotification('领取失败: ' + (d.error||''), 'error');
         }
         async function startTask(taskId) {
-            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/start`, {method:'POST'});
+            const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/start`, {method:'POST'});
             const d = await res.json();
             if (d.success) { loadTasks(); showNotification('▶️ 任务已开始'); }
             else showNotification('操作失败: ' + (d.error||''), 'error');
         }
         async function acceptTask(taskId) {
-            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/accept`, {method:'POST'});
+            const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/accept`, {method:'POST'});
             const d = await res.json();
             if (d.success) { loadTasks(); showNotification('✔️ 验收通过'); }
             else showNotification('操作失败: ' + (d.error||''), 'error');
@@ -2417,7 +2438,7 @@
                 deliverable_detail: document.getElementById('deliverDetail').value.trim(),
                 deliverable_path: document.getElementById('deliverPath').value.trim()
             };
-            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/deliver`, {
+            const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/deliver`, {
                 method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
             });
             const d = await res.json();
@@ -2439,7 +2460,7 @@
             const taskId = document.getElementById('rejectTaskId').value;
             const reason = document.getElementById('rejectReason').value.trim();
             if (!reason) { alert('请填写驳回原因'); return; }
-            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/reject`, {
+            const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/reject`, {
                 method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason})
             });
             const d = await res.json();
@@ -2458,7 +2479,7 @@
             const listEl = document.getElementById(`comments-list-${taskId}`);
             if (!listEl) return;
             try {
-                const res = await fetch(`${API_BASE}/api/tasks/${taskId}/comments`);
+                const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/comments`);
                 const d = await res.json();
                 const comments = d.comments || d.data || [];
                 renderComments(taskId, comments);
@@ -2493,7 +2514,7 @@
             const content = input.value.trim();
             if (!content) return;
             try {
-                const res = await fetch(`${API_BASE}/api/tasks/${taskId}/comments`, {
+                const res = await apiFetch(`${API_BASE}/api/tasks/${taskId}/comments`, {
                     method:'POST', headers:{'Content-Type':'application/json'},
                     body: JSON.stringify({ author: 'user', author_type: 'user', content })
                 });
@@ -2546,7 +2567,7 @@
                 }
                 
                 try {
-                    const response = await fetch(`${API_BASE}/api/todos/${taskId}`, {
+                    const response = await apiFetch(`${API_BASE}/api/todos/${taskId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ task: task })
@@ -2567,7 +2588,7 @@
         
         async function loadTasksData() {
             // 添加随机数参数避免缓存
-            const response = await fetch(`${API_BASE}/api/todos?_t=${Date.now()}`);
+            const response = await apiFetch(`${API_BASE}/api/todos?_t=${Date.now()}`);
             const data = await response.json();
             return data.tasks || [];
         }
@@ -2590,7 +2611,7 @@
         
         async function completeTask(taskId) {
             try {
-                const response = await fetch(`${API_BASE}/api/tasks/${taskId}/complete`, {
+                const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}/complete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({})
@@ -2668,7 +2689,7 @@
                 || document.getElementById('editTaskOwner')?.value
                 || 'unknown';
             try {
-                await fetch(`${API_BASE}/api/logs`, {
+                await apiFetch(`${API_BASE}/api/logs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ operator: owner, action, taskId, taskTitle, detail })
@@ -2682,7 +2703,7 @@
             const params = new URLSearchParams({ page: logsCurrentPage, pageSize: 50 });
             if (action) params.set('action', action);
             try {
-                const res = await fetch(`${API_BASE}/api/logs?${params}`);
+                const res = await apiFetch(`${API_BASE}/api/logs?${params}`);
                 const data = await res.json();
                 if (!data.success) return;
                 renderLogsTable(data.logs);
@@ -2730,11 +2751,11 @@
         async function loadStats() {
             try {
                 const [ovRes, prRes, owRes, tgRes, trRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/stats/overview`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/stats/priority`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/stats/owner`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/stats/tags`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/stats/trend`).then(r => r.json()),
+                    apiFetch(`${API_BASE}/api/stats/overview`).then(r => r.json()),
+                    apiFetch(`${API_BASE}/api/stats/priority`).then(r => r.json()),
+                    apiFetch(`${API_BASE}/api/stats/owner`).then(r => r.json()),
+                    apiFetch(`${API_BASE}/api/stats/tags`).then(r => r.json()),
+                    apiFetch(`${API_BASE}/api/stats/trend`).then(r => r.json()),
                 ]);
                 renderStatsOverview(ovRes.data);
                 renderStatsPriority(prRes.data);
@@ -2924,7 +2945,7 @@
         // ── 加载标签 chips ──
         async function loadFilterTags() {
             try {
-                const res = await fetch(`${API_BASE}/api/tasks/tags`);
+                const res = await apiFetch(`${API_BASE}/api/tasks/tags`);
                 const data = await res.json();
                 if (data.success) {
                     const container = document.getElementById('filterTag');
@@ -3138,6 +3159,211 @@
         window.submitReject = submitReject;
         window.toggleComments = toggleComments;
         window.submitComment = submitComment;
+        window.doLogin = doLogin;
+        window.showTokenPanel = showTokenPanel;
+        window.closeTokenPanel = closeTokenPanel;
+        window.copyToken = copyToken;
+        window.doLogout = doLogout;
+    </script>
+
+    <!-- Token 管理面板 -->
+    <div id="tokenPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:32px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:80vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                <div style="font-size:1.1em;font-weight:700;color:#1A1A2E;">⚙️ 账户 / Token 管理</div>
+                <button onclick="closeTokenPanel()" style="background:none;border:none;font-size:1.2em;cursor:pointer;color:#6B7280;">✕</button>
+            </div>
+            <div style="background:#F5F7F9;border-radius:10px;padding:16px;margin-bottom:20px;">
+                <div style="font-size:0.8em;color:#6B7280;margin-bottom:4px;">当前用户</div>
+                <div id="tpOwner" style="font-weight:600;font-size:1em;color:#1A1A2E;">—</div>
+            </div>
+            <div style="background:#F5F7F9;border-radius:10px;padding:16px;margin-bottom:20px;">
+                <div style="font-size:0.8em;color:#6B7280;margin-bottom:4px;">当前 Token（末4位）</div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div id="tpTokenMask" style="font-family:monospace;font-size:1em;color:#1A1A2E;letter-spacing:2px;">****</div>
+                    <button onclick="copyToken()" style="padding:4px 12px;background:#667eea;color:#fff;border:none;border-radius:6px;font-size:0.8em;cursor:pointer;">复制</button>
+                </div>
+            </div>
+            <div id="tpTokenList" style="margin-bottom:20px;"></div>
+            <button onclick="doLogout()" style="width:100%;padding:11px;background:#EF4444;color:#fff;border:none;border-radius:8px;font-size:0.9em;font-weight:600;cursor:pointer;">🚪 注销登录</button>
+        </div>
+    </div>
+
+    <script>
+    // ── Token 认证模块 ────────────────────────────────────────────────────────
+    const LS_TOKEN = 'todo_api_token';
+    const LS_OWNER = 'todo_owner';
+    const LS_TOKEN_ID = 'todo_token_id';
+
+    function getStoredToken() { return localStorage.getItem(LS_TOKEN); }
+    function getStoredOwner() { return localStorage.getItem(LS_OWNER); }
+
+    // 封装 fetch，自动附加 Authorization 头，处理 401
+    async function apiFetch(url, options = {}) {
+        const token = getStoredToken();
+        const headers = Object.assign({}, options.headers || {});
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const res = await fetch(url, { ...options, headers });
+        if (res.status === 401) {
+            localStorage.removeItem(LS_TOKEN);
+            localStorage.removeItem(LS_OWNER);
+            localStorage.removeItem(LS_TOKEN_ID);
+            showLoginOverlay();
+            throw new Error('401 Unauthorized');
+        }
+        return res;
+    }
+
+    function showLoginOverlay() {
+        const el = document.getElementById('loginOverlay');
+        if (el) { el.style.display = 'flex'; }
+    }
+
+    function hideLoginOverlay() {
+        const el = document.getElementById('loginOverlay');
+        if (el) { el.style.display = 'none'; }
+    }
+
+    async function doLogin() {
+        const ownerEl = document.getElementById('loginOwner');
+        const tokenEl = document.getElementById('loginToken');
+        const errEl   = document.getElementById('loginError');
+        const owner = ownerEl.value.trim();
+        const manualToken = tokenEl.value.trim();
+
+        errEl.style.display = 'none';
+        if (!owner) { errEl.textContent = '请输入用户名'; errEl.style.display = 'block'; return; }
+
+        if (manualToken) {
+            // 直接使用已有 token，验证一下
+            try {
+                const res = await apiFetch(`${API_BASE}/api/tokens?owner=${encodeURIComponent(owner)}`, {
+                    headers: { 'Authorization': 'Bearer ' + manualToken }
+                });
+                if (res.status === 401) {
+                    errEl.textContent = 'Token 无效或已过期，请重新获取'; errEl.style.display = 'block'; return;
+                }
+                localStorage.setItem(LS_TOKEN, manualToken);
+                localStorage.setItem(LS_OWNER, owner);
+            } catch(e) {
+                errEl.textContent = '验证失败：' + e.message; errEl.style.display = 'block'; return;
+            }
+        } else {
+            // 创建新 token
+            try {
+                const res = await apiFetch(`${API_BASE}/api/tokens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ owner })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    errEl.textContent = data.error || '获取 Token 失败'; errEl.style.display = 'block'; return;
+                }
+                localStorage.setItem(LS_TOKEN, data.token.token);
+                localStorage.setItem(LS_OWNER, owner);
+                localStorage.setItem(LS_TOKEN_ID, data.token.id);
+            } catch(e) {
+                errEl.textContent = '网络错误：' + e.message; errEl.style.display = 'block'; return;
+            }
+        }
+
+        hideLoginOverlay();
+        updateOwnerLabel();
+        loadTasks && loadTasks();
+        loadTags && loadTags();
+    }
+
+    function updateOwnerLabel() {
+        const owner = getStoredOwner();
+        const el = document.getElementById('sidebarOwnerLabel');
+        if (el && owner) el.textContent = '👤 ' + owner;
+    }
+
+    function showTokenPanel() {
+        const owner = getStoredOwner() || '—';
+        const token = getStoredToken() || '';
+        document.getElementById('tpOwner').textContent = owner;
+        document.getElementById('tpTokenMask').textContent = token ? '••••••••' + token.slice(-4) : '未登录';
+        document.getElementById('tokenPanel').style.display = 'flex';
+        // 加载 token 列表
+        if (owner !== '—') loadTokenList(owner);
+    }
+
+    function closeTokenPanel() {
+        document.getElementById('tokenPanel').style.display = 'none';
+    }
+
+    async function loadTokenList(owner) {
+        const el = document.getElementById('tpTokenList');
+        try {
+            const res = await apiFetch(`${API_BASE}/api/tokens?owner=${encodeURIComponent(owner)}`);
+            const data = await res.json();
+            if (!data.success) { el.innerHTML = ''; return; }
+            el.innerHTML = '<div style="font-size:0.8em;color:#6B7280;margin-bottom:8px;">Token 列表</div>' +
+                data.tokens.map(t => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F5F7F9;border-radius:8px;margin-bottom:6px;font-size:0.82em;">
+                        <div>
+                            <span style="font-family:monospace;color:#374151;">ID #${t.id}</span>
+                            <span style="margin-left:8px;color:${t.is_active ? '#10B981' : '#EF4444'};">${t.is_active ? '有效' : '已撤销'}</span>
+                            ${t.expires_at ? `<span style="margin-left:8px;color:#6B7280;">到期：${t.expires_at.slice(0,10)}</span>` : ''}
+                        </div>
+                        ${t.is_active ? `<button onclick="revokeToken(${t.id})" style="padding:3px 10px;background:#EF4444;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.85em;">撤销</button>` : ''}
+                    </div>`).join('');
+        } catch(e) { el.innerHTML = ''; }
+    }
+
+    async function revokeToken(tokenId) {
+        if (!confirm('确认撤销该 Token？')) return;
+        const currentId = parseInt(localStorage.getItem(LS_TOKEN_ID));
+        await apiFetch(`${API_BASE}/api/tokens/${tokenId}`, { method: 'DELETE' });
+        if (tokenId === currentId) {
+            doLogout();
+        } else {
+            loadTokenList(getStoredOwner());
+        }
+    }
+
+    function copyToken() {
+        const token = getStoredToken();
+        if (!token) return;
+        navigator.clipboard.writeText(token).then(() => {
+            showNotification && showNotification('Token 已复制到剪贴板', 'success');
+        });
+    }
+
+    async function doLogout() {
+        const tokenId = localStorage.getItem(LS_TOKEN_ID);
+        if (tokenId) {
+            try { await apiFetch(`${API_BASE}/api/tokens/${tokenId}`, { method: 'DELETE' }); } catch(_) {}
+        }
+        localStorage.removeItem(LS_TOKEN);
+        localStorage.removeItem(LS_OWNER);
+        localStorage.removeItem(LS_TOKEN_ID);
+        closeTokenPanel();
+        showLoginOverlay();
+    }
+
+    // 启动时检查 token
+    (function checkAuth() {
+        if (!getStoredToken()) {
+            // 延迟到 DOM 就绪后显示
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', showLoginOverlay);
+            } else {
+                showLoginOverlay();
+            }
+        } else {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', updateOwnerLabel);
+            } else {
+                updateOwnerLabel();
+            }
+        }
+    })();
     </script>
 </body>
 </html>

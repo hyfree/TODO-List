@@ -5,9 +5,9 @@ Todo List Server v6.0 - FastAPI
 与 v5.0 API 完全兼容
 """
 
-import os, json, re, asyncio, logging, traceback
+import os, json, re, asyncio, logging, traceback, secrets, hashlib
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from logging.handlers import RotatingFileHandler
 from typing import Optional, List
 
@@ -147,6 +147,117 @@ def _row_to_task(row):
         if t.get(k) is None:
             t.pop(k, None)
     return t
+
+def _init_token_table():
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS todo_api_tokens (
+                    id SERIAL PRIMARY KEY,
+                    token_hash VARCHAR(64) NOT NULL UNIQUE,
+                    owner VARCHAR(100) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    expires_at TIMESTAMPTZ,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE
+                )
+            """)
+            conn.commit()
+            logger.info("todo_api_tokens 表初始化完成")
+    except Exception as e:
+        logger.error("初始化 token 表失败: %s", e, exc_info=True)
+        raise
+    finally:
+        _put_conn(conn)
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def token_create(owner: str, expires_in_days: Optional[int] = None):
+    raw = secrets.token_urlsafe(32)
+    token_hash = _hash_token(raw)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days) if expires_in_days else None
+    conn = _get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO todo_api_tokens (token_hash, owner, expires_at)
+                VALUES (%s, %s, %s) RETURNING id, owner, created_at, expires_at, is_active
+            """, (token_hash, owner, expires_at))
+            conn.commit()
+            row = dict(cur.fetchone())
+            row['token'] = raw  # 只在创建时返回明文
+            row['created_at'] = _fmt_ts(row['created_at'])
+            row['expires_at'] = _fmt_ts(row['expires_at'])
+            return row
+    finally:
+        _put_conn(conn)
+
+def token_list(owner: str):
+    conn = _get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, owner, created_at, expires_at, is_active
+                FROM todo_api_tokens WHERE owner = %s ORDER BY created_at DESC
+            """, (owner,))
+            rows = []
+            for r in cur.fetchall():
+                d = dict(r)
+                d['created_at'] = _fmt_ts(d['created_at'])
+                d['expires_at'] = _fmt_ts(d['expires_at'])
+                rows.append(d)
+            return rows
+    finally:
+        _put_conn(conn)
+
+def token_revoke(token_id: int):
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE todo_api_tokens SET is_active = FALSE WHERE id = %s", (token_id,))
+            conn.commit()
+            return cur.rowcount > 0
+    finally:
+        _put_conn(conn)
+
+def token_verify(raw: str) -> Optional[str]:
+    """验证 token，返回 owner 或 None"""
+    token_hash = _hash_token(raw)
+    conn = _get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT owner, expires_at, is_active FROM todo_api_tokens
+                WHERE token_hash = %s
+            """, (token_hash,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            if not row['is_active']:
+                return None
+            if row['expires_at'] and row['expires_at'] < datetime.now(timezone.utc):
+                return None
+            return row['owner']
+    finally:
+        _put_conn(conn)
+
+# 免认证路径集合
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+
+def _is_public(path: str, method: str) -> bool:
+    if path in _PUBLIC_PATHS:
+        return True
+    # POST /api/tokens 免认证（创建 token）
+    if path == "/api/tokens" and method == "POST":
+        return True
+    # 静态页面
+    if not path.startswith("/api/"):
+        return True
+    # SSE 暂时免认证（EventSource 不支持自定义 header）
+    if path == "/api/events":
+        return True
+    return False
 
 def _new_id():
     date_str = datetime.now().strftime("%Y%m%d")
@@ -643,12 +754,36 @@ def add_note(task_id, author, text):
 
 app = FastAPI(title="Todo List API v6.0")
 
+@app.on_event("startup")
+async def startup_event():
+    _get_pool()
+    await asyncio.to_thread(_init_token_table)
+    logger.info("服务启动完成，Token 表已就绪")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if not _is_public(request.url.path, request.method):
+        # 优先从 Authorization header 取，其次从 query param
+        token = None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+        if not token:
+            token = request.query_params.get("api_token")
+        if not token:
+            return JSONResponse({"success": False, "error": "未授权，请提供 Bearer Token"}, status_code=401)
+        owner = await asyncio.to_thread(token_verify, token)
+        if not owner:
+            return JSONResponse({"success": False, "error": "Token 无效、已过期或已撤销"}, status_code=401)
+        request.state.owner = owner
+    return await call_next(request)
 
 @app.middleware("http")
 async def request_logger(request: Request, call_next):
@@ -665,6 +800,39 @@ async def request_logger(request: Request, call_next):
 
 def ok(data: dict, status_code: int = 200):
     return JSONResponse(content=data, status_code=status_code)
+
+# ── 健康检查 ──────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    return ok({"status": "ok", "service": "todo-api", "version": "6.0"})
+
+# ── Token 管理 ────────────────────────────────────────────────────────────────
+
+@app.post("/api/tokens")
+async def create_token(request: Request):
+    data = await request.json()
+    owner = data.get("owner", "").strip()
+    if not owner:
+        return ok({"success": False, "error": "owner 不能为空"}, 400)
+    expires_in_days = data.get("expires_in_days")
+    result = await asyncio.to_thread(token_create, owner, expires_in_days)
+    return ok({"success": True, "token": result}, 201)
+
+@app.get("/api/tokens")
+async def list_tokens(request: Request, owner: str = Query(default="")):
+    q_owner = owner or getattr(request.state, "owner", "")
+    if not q_owner:
+        return ok({"success": False, "error": "需要指定 owner"}, 400)
+    tokens = await asyncio.to_thread(token_list, q_owner)
+    return ok({"success": True, "tokens": tokens})
+
+@app.delete("/api/tokens/{token_id}")
+async def revoke_token(token_id: int):
+    ok_flag = await asyncio.to_thread(token_revoke, token_id)
+    if ok_flag:
+        return ok({"success": True})
+    return ok({"success": False, "error": "Token 不存在"}, 404)
 
 # ── SSE ───────────────────────────────────────────────────────────────────────
 
@@ -901,6 +1069,8 @@ async def delete_task_endpoint(task_id: str):
 # ── 入口 ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    _get_pool()
+    _init_token_table()
     import uvicorn
     print("🚀 Todo List Server v6.0 (FastAPI) 启动")
     print(f"   DB: {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['dbname']}")
