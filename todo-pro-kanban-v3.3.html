@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎯 任务指挥中心 - Todo List Pro v3.2</title>
+    <title>🎯 任务指挥中心 - Todo List Pro v3.4</title>
     <style>
         :root {
             --bg-primary: #F5F7F9;
@@ -12,9 +12,13 @@
             --text-secondary: #6B7280;
             --border: #E5E7EB;
             --status-pending: #3B82F6;
+            --status-claimed: #6366F1;
             --status-progress: #F59E0B;
-            --status-completed: #10B981;
+            --status-delivered: #F97316;
+            --status-accepted: #10B981;
+            --status-completed: #059669;
             --status-failed: #EF4444;
+            --status-rejected: #DC2626;
             --sidebar-width: 280px;
             --header-height: 64px;
         }
@@ -168,7 +172,7 @@
         
         .kanban-board {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, minmax(220px, 1fr));
             gap: 16px;
             padding: 24px;
             height: 100%;
@@ -214,10 +218,125 @@
             font-weight: 600;
         }
         
-        .column-count.pending { background: var(--status-pending); color: white; }
-        .column-count.progress { background: var(--status-progress); color: white; }
+        .column-count.pending   { background: var(--status-pending);   color: white; }
+        .column-count.claimed   { background: var(--status-claimed);   color: white; }
+        .column-count.progress  { background: var(--status-progress);  color: white; }
+        .column-count.delivered { background: var(--status-delivered); color: white; }
+        .column-count.accepted  { background: var(--status-accepted);  color: white; }
         .column-count.completed { background: var(--status-completed); color: white; }
-        .column-count.failed { background: var(--status-failed); color: white; }
+        .column-count.failed    { background: var(--status-failed);    color: white; }
+        .column-count.rejected  { background: var(--status-rejected);  color: white; }
+
+        /* assignee 标签 */
+        .assignee-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 0.72em; font-weight: 600;
+            padding: 2px 7px; border-radius: 10px;
+            margin-top: 5px;
+        }
+        .assignee-badge.wangcai   { background: #DBEAFE; color: #1E40AF; }
+        .assignee-badge.subagent  { background: #EDE9FE; color: #5B21B6; }
+        .assignee-badge.user      { background: #D1FAE5; color: #065F46; }
+        .assignee-badge.auto      { background: #F3F4F6; color: #374151; }
+
+        /* 需验收徽章 */
+        .acceptance-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 0.7em; font-weight: 600;
+            padding: 2px 6px; border-radius: 10px;
+            background: #FEF3C7; color: #92400E;
+            margin-left: 4px;
+        }
+
+        /* 任务类型标签 */
+        .task-type-badge {
+            display: inline-flex; align-items: center;
+            font-size: 0.7em; font-weight: 600;
+            padding: 2px 6px; border-radius: 4px;
+            background: #F3F4F6; color: #6B7280;
+            margin-left: 4px;
+        }
+
+        /* 交付物摘要 */
+        .deliverable-summary {
+            font-size: 0.75em; color: var(--status-delivered);
+            background: #FFF7ED; border-left: 3px solid var(--status-delivered);
+            padding: 4px 8px; border-radius: 0 4px 4px 0;
+            margin-top: 6px; line-height: 1.4;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* 状态操作按钮 */
+        .lifecycle-btn {
+            padding: 4px 10px; border-radius: 6px; border: none;
+            font-size: 0.78em; font-weight: 600; cursor: pointer;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .lifecycle-btn.claim    { background: #EDE9FE; color: #5B21B6; }
+        .lifecycle-btn.claim:hover    { background: #DDD6FE; }
+        .lifecycle-btn.start    { background: #DBEAFE; color: #1E40AF; }
+        .lifecycle-btn.start:hover    { background: #BFDBFE; }
+        .lifecycle-btn.deliver  { background: #FEF3C7; color: #92400E; }
+        .lifecycle-btn.deliver:hover  { background: #FDE68A; }
+        .lifecycle-btn.accept   { background: #D1FAE5; color: #065F46; }
+        .lifecycle-btn.accept:hover   { background: #A7F3D0; }
+        .lifecycle-btn.reject   { background: #FEE2E2; color: #991B1B; }
+        .lifecycle-btn.reject:hover   { background: #FECACA; }
+
+        /* 讨论区 */
+        .comments-section {
+            margin-top: 10px;
+            border-top: 1px dashed var(--border);
+            padding-top: 10px;
+            display: none;
+        }
+        .comments-section.open { display: block; }
+        .comments-toggle {
+            font-size: 0.75em; color: var(--text-secondary);
+            cursor: pointer; user-select: none; margin-top: 6px;
+        }
+        .comments-toggle:hover { color: var(--text-primary); }
+        .comment-item {
+            display: flex; flex-direction: column;
+            gap: 2px; margin-bottom: 8px;
+            padding: 6px 8px; border-radius: 6px;
+            background: var(--bg-primary);
+        }
+        .comment-meta {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.72em; color: var(--text-secondary);
+        }
+        .comment-author-icon { font-size: 1em; }
+        .comment-text { font-size: 0.8em; color: var(--text-primary); line-height: 1.4; }
+        .comment-input-row {
+            display: flex; gap: 6px; margin-top: 8px;
+        }
+        .comment-input {
+            flex: 1; border: 1px solid var(--border);
+            border-radius: 6px; padding: 5px 8px;
+            font-size: 0.8em; outline: none;
+            background: var(--bg-card); color: var(--text-primary);
+        }
+        .comment-input:focus { border-color: #667eea; }
+        .comment-submit {
+            padding: 5px 10px; border-radius: 6px; border: none;
+            background: #667eea; color: white; cursor: pointer; font-size: 0.8em;
+        }
+        .comment-submit:hover { background: #5a6fd6; }
+
+        /* 状态chip新增 */
+        .status-chip.claimed   { background: rgba(99,102,241,0.12);  color: var(--status-claimed); }
+        .status-chip.delivered { background: rgba(249,115,22,0.12);  color: var(--status-delivered); }
+        .status-chip.accepted  { background: rgba(16,185,129,0.12);  color: var(--status-accepted); }
+        .status-chip.rejected  { background: rgba(220,38,38,0.12);   color: var(--status-rejected); }
+
+        /* 响应式：6列看板小屏横滚 */
+        @media (max-width: 1400px) { .kanban-board { grid-template-columns: repeat(6, minmax(200px, 1fr)); } }
+        @media (max-width: 768px) {
+            .app-container { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .kanban-board { grid-template-columns: repeat(6, 220px); }
+        }
         
         .column-content {
             flex: 1;
@@ -758,13 +877,7 @@
             background: var(--status-progress);
         }
         
-        /* 响应式 */
-        @media (max-width: 1400px) { .kanban-board { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 768px) {
-            .app-container { grid-template-columns: 1fr; }
-            .sidebar { display: none; }
-            .kanban-board { grid-template-columns: 1fr; }
-        }
+        /* 响应式规则已移至新状态样式块 */
 
         /* ── 视图切换按钮 ── */
         .view-switcher {
@@ -1145,63 +1258,70 @@
             </div>
             <div class="kanban-board">
                 <!-- 待处理列 -->
-                <div class="kanban-column" data-status="pending" 
-                     ondragover="handleDragOver(event)" 
+                <div class="kanban-column" data-status="pending"
+                     ondragover="handleDragOver(event)"
                      ondrop="handleDrop(event, 'pending')"
                      ondragleave="handleDragLeave(event)">
                     <div class="column-header">
-                        <div class="column-title">
-                            <span class="column-icon">⏳</span>
-                            <span>待处理</span>
-                        </div>
+                        <div class="column-title"><span class="column-icon">⏳</span><span>待处理</span></div>
                         <span class="column-count pending" id="count-pending">0</span>
                     </div>
                     <div class="column-content" id="column-pending"></div>
                 </div>
-                
+                <!-- 已领取列 -->
+                <div class="kanban-column" data-status="claimed"
+                     ondragover="handleDragOver(event)"
+                     ondrop="handleDrop(event, 'claimed')"
+                     ondragleave="handleDragLeave(event)">
+                    <div class="column-header">
+                        <div class="column-title"><span class="column-icon">🙋</span><span>已领取</span></div>
+                        <span class="column-count claimed" id="count-claimed">0</span>
+                    </div>
+                    <div class="column-content" id="column-claimed"></div>
+                </div>
                 <!-- 进行中列 -->
-                <div class="kanban-column" data-status="progress" 
-                     ondragover="handleDragOver(event)" 
+                <div class="kanban-column" data-status="progress"
+                     ondragover="handleDragOver(event)"
                      ondrop="handleDrop(event, 'progress')"
                      ondragleave="handleDragLeave(event)">
                     <div class="column-header">
-                        <div class="column-title">
-                            <span class="column-icon">🔄</span>
-                            <span>进行中</span>
-                        </div>
+                        <div class="column-title"><span class="column-icon">🔄</span><span>进行中</span></div>
                         <span class="column-count progress" id="count-progress">0</span>
                     </div>
                     <div class="column-content" id="column-progress"></div>
                 </div>
-                
+                <!-- 交付中列 -->
+                <div class="kanban-column" data-status="delivered"
+                     ondragover="handleDragOver(event)"
+                     ondrop="handleDrop(event, 'delivered')"
+                     ondragleave="handleDragLeave(event)">
+                    <div class="column-header">
+                        <div class="column-title"><span class="column-icon">📦</span><span>交付中</span></div>
+                        <span class="column-count delivered" id="count-delivered">0</span>
+                    </div>
+                    <div class="column-content" id="column-delivered"></div>
+                </div>
+                <!-- 已验收列 -->
+                <div class="kanban-column" data-status="accepted"
+                     ondragover="handleDragOver(event)"
+                     ondrop="handleDrop(event, 'accepted')"
+                     ondragleave="handleDragLeave(event)">
+                    <div class="column-header">
+                        <div class="column-title"><span class="column-icon">✔️</span><span>已验收</span></div>
+                        <span class="column-count accepted" id="count-accepted">0</span>
+                    </div>
+                    <div class="column-content" id="column-accepted"></div>
+                </div>
                 <!-- 已完成列 -->
-                <div class="kanban-column" data-status="completed" 
-                     ondragover="handleDragOver(event)" 
+                <div class="kanban-column" data-status="completed"
+                     ondragover="handleDragOver(event)"
                      ondrop="handleDrop(event, 'completed')"
                      ondragleave="handleDragLeave(event)">
                     <div class="column-header">
-                        <div class="column-title">
-                            <span class="column-icon">✅</span>
-                            <span>已完成</span>
-                        </div>
+                        <div class="column-title"><span class="column-icon">✅</span><span>已完成</span></div>
                         <span class="column-count completed" id="count-completed">0</span>
                     </div>
                     <div class="column-content" id="column-completed"></div>
-                </div>
-                
-                <!-- 失败/阻塞列 -->
-                <div class="kanban-column" data-status="failed" 
-                     ondragover="handleDragOver(event)" 
-                     ondrop="handleDrop(event, 'failed')"
-                     ondragleave="handleDragLeave(event)">
-                    <div class="column-header">
-                        <div class="column-title">
-                            <span class="column-icon">⚠️</span>
-                            <span>失败/阻塞</span>
-                        </div>
-                        <span class="column-count failed" id="count-failed">0</span>
-                    </div>
-                    <div class="column-content" id="column-failed"></div>
                 </div>
             </div>
             <!-- 表格视图 -->
@@ -1317,9 +1437,13 @@
                 <div class="filter-section-title">状态</div>
                 <div class="chip-group" id="filterStatus">
                     <div class="chip" data-val="pending" onclick="toggleChip(this,'status')">⏳ 待处理</div>
+                    <div class="chip" data-val="claimed" onclick="toggleChip(this,'status')">🙋 已领取</div>
                     <div class="chip" data-val="progress" onclick="toggleChip(this,'status')">🔄 进行中</div>
+                    <div class="chip" data-val="delivered" onclick="toggleChip(this,'status')">📦 交付中</div>
+                    <div class="chip" data-val="accepted" onclick="toggleChip(this,'status')">✔️ 已验收</div>
                     <div class="chip" data-val="completed" onclick="toggleChip(this,'status')">✅ 已完成</div>
                     <div class="chip" data-val="failed" onclick="toggleChip(this,'status')">⚠️ 失败/阻塞</div>
+                    <div class="chip" data-val="rejected" onclick="toggleChip(this,'status')">❌ 已驳回</div>
                 </div>
             </div>
             <div>
@@ -1435,6 +1559,36 @@
                         </select>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">执行者（Assignee）</label>
+                        <select class="form-select" id="taskAssignee">
+                            <option value="">自动</option>
+                            <option value="wangcai">🐕 旺财</option>
+                            <option value="user">🐟 用户</option>
+                            <option value="subagent">🤖 子智能体</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">任务类型</label>
+                        <select class="form-select" id="taskType">
+                            <option value="">普通</option>
+                            <option value="sub_agent">子智能体</option>
+                            <option value="multi_agent">多智能体</option>
+                            <option value="manual">手动</option>
+                            <option value="auto">自动</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:10px;">
+                        是否需要验收
+                        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;">
+                            <input type="checkbox" id="taskRequiresAcceptance" checked style="width:16px;height:16px;accent-color:#667eea;">
+                            <span style="font-size:0.875em;color:var(--text-secondary);">开启后任务需经验收才算完成</span>
+                        </label>
+                    </label>
+                </div>
             </div>
             
             <div class="modal-footer">
@@ -1531,6 +1685,57 @@
         </div>
     </div>
     
+    <!-- 交付模态框 -->
+    <div class="modal-overlay" id="deliverModal">
+        <div class="modal" style="max-width:560px">
+            <div class="modal-header">
+                <div class="modal-title">📦 提交交付物</div>
+                <button class="modal-close" onclick="closeDeliverModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deliverTaskId">
+                <div class="form-group">
+                    <label class="form-label">交付物描述 *</label>
+                    <textarea class="form-textarea" id="deliverDeliverable" placeholder="描述本次交付的内容和成果..." style="min-height:100px"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">详细说明</label>
+                    <textarea class="form-textarea" id="deliverDetail" placeholder="可选：补充说明、注意事项等..." style="min-height:80px"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">交付物路径/位置</label>
+                    <input type="text" class="form-input" id="deliverPath" placeholder="如：docs/report.md 或 http://...">
+                    <div class="form-help">可选：文件路径、URL 或其他位置标识</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeliverModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitDeliver()">📦 提交交付</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 驳回模态框 -->
+    <div class="modal-overlay" id="rejectModal">
+        <div class="modal" style="max-width:480px">
+            <div class="modal-header">
+                <div class="modal-title">❌ 驳回任务</div>
+                <button class="modal-close" onclick="closeRejectModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="rejectTaskId">
+                <div class="form-group">
+                    <label class="form-label">驳回原因 *</label>
+                    <textarea class="form-textarea" id="rejectReason" placeholder="请说明驳回原因，执行者将重新处理..." style="min-height:120px"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRejectModal()">取消</button>
+                <button class="btn" style="background:#EF4444;color:white" onclick="submitReject()">❌ 确认驳回</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 撤销提示 -->
     <div class="undo-toast" id="undoToast">
         <span id="undoMessage">任务已移动</span>
@@ -1706,6 +1911,9 @@
             selectPriority('P1', document.querySelector('.priority-option.P1'));
             document.getElementById('taskTag').value = '学习';
             document.getElementById('taskOwner').value = 'xianxiaoyu';
+            document.getElementById('taskAssignee').value = '';
+            document.getElementById('taskType').value = '';
+            document.getElementById('taskRequiresAcceptance').checked = true;
         }
         
         function selectPriority(priority, element) {
@@ -1735,6 +1943,9 @@
                 owner: document.getElementById('taskOwner').value,
                 startDate: document.getElementById('taskStartDate').value,
                 dueDate: document.getElementById('taskDueDate').value,
+                assignee: document.getElementById('taskAssignee').value || null,
+                task_type: document.getElementById('taskType').value || null,
+                requires_acceptance: document.getElementById('taskRequiresAcceptance').checked,
                 completed: false
             };
             
@@ -1891,41 +2102,86 @@
         }
         
         function renderTasks(tasks) {
-            ['pending', 'progress', 'completed', 'failed'].forEach(status => {
-                document.getElementById(`column-${status}`).innerHTML = '';
-                document.getElementById(`count-${status}`).textContent = '0';
+            const allStatuses = ['pending', 'claimed', 'progress', 'delivered', 'accepted', 'completed', 'failed', 'rejected'];
+            allStatuses.forEach(status => {
+                const col = document.getElementById(`column-${status}`);
+                const cnt = document.getElementById(`count-${status}`);
+                if (col) col.innerHTML = '';
+                if (cnt) cnt.textContent = '0';
             });
-            
-            const counts = { pending: 0, progress: 0, completed: 0, failed: 0 };
+
+            const counts = {};
+            allStatuses.forEach(s => counts[s] = 0);
             const validTasks = tasks.filter(t => t.title && t.title.trim());
-            
+
             validTasks.forEach((task, index) => {
-                // 优先使用 status 字段，向后兼容 completed 字段
                 let status = task.status || 'pending';
                 if (!task.status) {
                     status = task.completed ? 'completed' : (task.priority === 'high' ? 'progress' : 'pending');
                 }
-                renderTaskCard(task, status, index + 1);
-                counts[status]++;
+                // map old 'in_progress' to 'progress'
+                if (status === 'in_progress') status = 'progress';
+                const col = document.getElementById(`column-${status}`);
+                if (col) {
+                    renderTaskCard(task, status, index + 1);
+                    counts[status] = (counts[status] || 0) + 1;
+                }
             });
-            
-            Object.keys(counts).forEach(status => {
-                document.getElementById(`count-${status}`).textContent = counts[status];
-                const column = document.getElementById(`column-${status}`);
-                if (counts[status] === 0) {
-                    column.innerHTML = '<div class="empty-state">暂无任务</div>';
+
+            allStatuses.forEach(status => {
+                const cnt = document.getElementById(`count-${status}`);
+                if (cnt) cnt.textContent = counts[status] || 0;
+                const col = document.getElementById(`column-${status}`);
+                if (col && (counts[status] || 0) === 0) {
+                    col.innerHTML = '<div class="empty-state">暂无任务</div>';
                 }
             });
         }
         
+        function getAssigneeBadge(assignee) {
+            if (!assignee) return '';
+            let cls = 'auto', icon = '⚙️', label = assignee;
+            if (assignee === 'wangcai') { cls = 'wangcai'; icon = '🐕'; label = '旺财'; }
+            else if (assignee === 'user') { cls = 'user'; icon = '🐟'; label = '用户'; }
+            else if (assignee && assignee.startsWith('subagent')) { cls = 'subagent'; icon = '🤖'; label = assignee; }
+            else if (assignee === 'subagent') { cls = 'subagent'; icon = '🤖'; label = '子智能体'; }
+            return `<span class="assignee-badge ${cls}">${icon} ${label}</span>`;
+        }
+
+        function getTaskTypeBadge(taskType) {
+            const map = { sub_agent: '🤖 子智能体', multi_agent: '🔀 多智能体', manual: '✋ 手动', auto: '⚡ 自动' };
+            return taskType && map[taskType] ? `<span class="task-type-badge">${map[taskType]}</span>` : '';
+        }
+
+        function getLifecycleButtons(task, status) {
+            const id = task.id;
+            if (status === 'pending')
+                return `<button class="lifecycle-btn claim" onclick="event.stopPropagation();claimTask('${id}')" title="领取任务">🙋 领取</button>`;
+            if (status === 'claimed')
+                return `<button class="lifecycle-btn start" onclick="event.stopPropagation();startTask('${id}')" title="开始执行">▶️ 开始</button>`;
+            if (status === 'progress' || status === 'in_progress')
+                return `<button class="lifecycle-btn deliver" onclick="event.stopPropagation();openDeliverModal('${id}')" title="提交交付物">📦 交付</button>`;
+            if (status === 'delivered')
+                return `<button class="lifecycle-btn accept" onclick="event.stopPropagation();acceptTask('${id}')" title="验收通过">✔️ 验收</button>
+                        <button class="lifecycle-btn reject" onclick="event.stopPropagation();openRejectModal('${id}')" title="驳回">❌ 驳回</button>`;
+            return '';
+        }
+
         function renderTaskCard(task, status, step) {
             const column = document.getElementById(`column-${status}`);
+            if (!column) return;
             const tagClass = { '学习': 'learning', '工作': 'work', '生活': 'life' }[task.tag] || 'other';
             const pMap = { 'high': 'P0', 'medium': 'P1', 'low': 'P2' };
             const priority = pMap[task.priority] || task.priority || 'P1';
             const ownerEmoji = { 'wangcai': '🐕', 'xianxiaoyu': '🐟', 'shared': '🤝' }[task.owner] || '';
             const dueBadge = getDueBadge(task.dueDate);
             const notesCount = (task.notes || []).length;
+            const assigneeBadge = getAssigneeBadge(task.assignee);
+            const typeBadge = getTaskTypeBadge(task.task_type);
+            const acceptanceBadge = task.requires_acceptance ? `<span class="acceptance-badge">✓ 待验收</span>` : '';
+            const deliverableSummary = (status === 'delivered' && task.deliverable)
+                ? `<div class="deliverable-summary">📦 ${task.deliverable}</div>` : '';
+            const lifecycleBtns = getLifecycleButtons(task, status);
 
             const card = document.createElement('div');
             card.className = 'task-card';
@@ -1941,16 +2197,19 @@
                 </div>
                 <div class="task-title">
                     <span class="priority-badge ${priority}">${getPriorityText(priority)}</span>
-                    ${task.title}${dueBadge}
+                    ${task.title}${dueBadge}${acceptanceBadge}${typeBadge}
                 </div>
+                ${assigneeBadge ? `<div style="margin-bottom:4px">${assigneeBadge}</div>` : ''}
                 <div class="task-description">${(task.description || '').substring(0, 100)}${(task.description || '').length > 100 ? '...' : ''}</div>
+                ${deliverableSummary}
                 <div class="task-footer">
                     <div class="task-priority">
                         <div class="priority-dot ${priority}"></div>
                         <span>${priority}</span>
                     </div>
                     <div class="task-actions">
-                        ${status !== 'completed' ? `
+                        ${lifecycleBtns}
+                        ${status !== 'completed' && status !== 'accepted' ? `
                             <button class="task-action-btn complete" onclick="completeTask('${task.id}')" title="完成">✅</button>
                         ` : ''}
                         <button class="task-action-btn edit" onclick="event.stopPropagation(); openEditTaskById('${task.id}')" title="编辑">📝</button>
@@ -1978,6 +2237,18 @@
                     <div class="note-input-row">
                         <input class="note-input" placeholder="添加备注，回车提交..." onkeydown="if(event.key==='Enter'){submitNote('${task.id}',this)}">
                         <button class="note-submit" onclick="submitNote('${task.id}',this.previousElementSibling)">➕</button>
+                    </div>
+                </div>
+                <div class="comments-toggle" onclick="toggleComments('${task.id}')">
+                    💬 讨论区 ▾
+                </div>
+                <div class="comments-section" id="comments-${task.id}">
+                    <div class="comments-list" id="comments-list-${task.id}">
+                        <div style="font-size:0.75em;color:var(--text-secondary);text-align:center;padding:8px">加载中...</div>
+                    </div>
+                    <div class="comment-input-row">
+                        <input class="comment-input" id="comment-input-${task.id}" placeholder="发表评论..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${task.id}')}">
+                        <button class="comment-submit" onclick="submitComment('${task.id}')">发送</button>
                     </div>
                 </div>
             `;
@@ -2105,17 +2376,148 @@
             }
         }
         
-        // 撤销功能
+        // ── 任务生命周期 API ──
+        async function claimTask(taskId) {
+            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/claim`, {method:'POST'});
+            const d = await res.json();
+            if (d.success) { loadTasks(); showNotification('🙋 已领取任务'); }
+            else showNotification('领取失败: ' + (d.error||''), 'error');
+        }
+        async function startTask(taskId) {
+            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/start`, {method:'POST'});
+            const d = await res.json();
+            if (d.success) { loadTasks(); showNotification('▶️ 任务已开始'); }
+            else showNotification('操作失败: ' + (d.error||''), 'error');
+        }
+        async function acceptTask(taskId) {
+            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/accept`, {method:'POST'});
+            const d = await res.json();
+            if (d.success) { loadTasks(); showNotification('✔️ 验收通过'); }
+            else showNotification('操作失败: ' + (d.error||''), 'error');
+        }
+
+        // ── 交付模态框 ──
+        function openDeliverModal(taskId) {
+            document.getElementById('deliverTaskId').value = taskId;
+            document.getElementById('deliverDeliverable').value = '';
+            document.getElementById('deliverDetail').value = '';
+            document.getElementById('deliverPath').value = '';
+            document.getElementById('deliverModal').classList.add('active');
+            document.getElementById('deliverDeliverable').focus();
+        }
+        function closeDeliverModal() {
+            document.getElementById('deliverModal').classList.remove('active');
+        }
+        async function submitDeliver() {
+            const taskId = document.getElementById('deliverTaskId').value;
+            const deliverable = document.getElementById('deliverDeliverable').value.trim();
+            if (!deliverable) { alert('请填写交付物描述'); return; }
+            const body = {
+                deliverable,
+                deliverable_detail: document.getElementById('deliverDetail').value.trim(),
+                deliverable_path: document.getElementById('deliverPath').value.trim()
+            };
+            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/deliver`, {
+                method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+            });
+            const d = await res.json();
+            if (d.success) { closeDeliverModal(); loadTasks(); showNotification('📦 交付物已提交'); }
+            else alert('提交失败: ' + (d.error||'未知错误'));
+        }
+
+        // ── 驳回模态框 ──
+        function openRejectModal(taskId) {
+            document.getElementById('rejectTaskId').value = taskId;
+            document.getElementById('rejectReason').value = '';
+            document.getElementById('rejectModal').classList.add('active');
+            document.getElementById('rejectReason').focus();
+        }
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.remove('active');
+        }
+        async function submitReject() {
+            const taskId = document.getElementById('rejectTaskId').value;
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) { alert('请填写驳回原因'); return; }
+            const res = await fetch(`${API_BASE}/api/tasks/${taskId}/reject`, {
+                method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason})
+            });
+            const d = await res.json();
+            if (d.success) { closeRejectModal(); loadTasks(); showNotification('❌ 任务已驳回，退回执行者'); }
+            else alert('操作失败: ' + (d.error||'未知错误'));
+        }
+
+        // ── 讨论区 ──
+        function toggleComments(taskId) {
+            const section = document.getElementById(`comments-${taskId}`);
+            if (!section) return;
+            const isOpen = section.classList.toggle('open');
+            if (isOpen) loadComments(taskId);
+        }
+        async function loadComments(taskId) {
+            const listEl = document.getElementById(`comments-list-${taskId}`);
+            if (!listEl) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/tasks/${taskId}/comments`);
+                const d = await res.json();
+                const comments = d.comments || d.data || [];
+                renderComments(taskId, comments);
+            } catch(e) {
+                listEl.innerHTML = '<div style="font-size:0.75em;color:var(--text-secondary);text-align:center;padding:8px">加载失败</div>';
+            }
+        }
+        function renderComments(taskId, comments) {
+            const listEl = document.getElementById(`comments-list-${taskId}`);
+            if (!listEl) return;
+            if (!comments.length) {
+                listEl.innerHTML = '<div style="font-size:0.75em;color:var(--text-secondary);text-align:center;padding:8px">暂无评论</div>';
+                return;
+            }
+            const iconMap = { wangcai:'🐕', user:'🐟', subagent:'🤖' };
+            listEl.innerHTML = [...comments].reverse().map(c => {
+                const icon = iconMap[c.author_type] || iconMap[c.author] || '💬';
+                const time = (c.created_at||c.createdAt||'').slice(0,16).replace('T',' ');
+                return `<div class="comment-item">
+                    <div class="comment-meta">
+                        <span class="comment-author-icon">${icon}</span>
+                        <span>${c.author||'匿名'}</span>
+                        <span>·</span>
+                        <span>${time}</span>
+                    </div>
+                    <div class="comment-text">${(c.content||'').replace(/</g,'&lt;')}</div>
+                </div>`;
+            }).join('');
+        }
+        async function submitComment(taskId) {
+            const input = document.getElementById(`comment-input-${taskId}`);
+            const content = input.value.trim();
+            if (!content) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/tasks/${taskId}/comments`, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ author: 'user', author_type: 'user', content })
+                });
+                const d = await res.json();
+                if (d.success !== false) {
+                    input.value = '';
+                    loadComments(taskId);
+                    showNotification('💬 评论已发送');
+                }
+            } catch(e) { console.error('评论失败', e); }
+        }
+
+        // ── 撤销功能
         function showUndoToast(newStatus) {
             const toast = document.getElementById('undoToast');
             const message = document.getElementById('undoMessage');
             
             const statusText = {
-                'pending': '待处理',
-                'progress': '进行中',
-                'completed': '已完成',
-                'failed': '失败/阻塞'
-            }[newStatus];
+                'pending': '待处理', 'claimed': '已领取',
+                'progress': '进行中', 'in_progress': '进行中',
+                'delivered': '交付中', 'accepted': '已验收',
+                'completed': '已完成', 'failed': '失败/阻塞',
+                'rejected': '已驳回'
+            }[newStatus] || newStatus;
             
             message.textContent = `任务已移动到 ${statusText}`;
             toast.classList.add('show');
@@ -2172,19 +2574,16 @@
         
         function updateStats(tasks) {
             const validTasks = tasks.filter(t => t.title && t.title.trim());
-            // 优先使用 status 字段，向后兼容
-            const completed = validTasks.filter(t => t.status === 'completed' || (t.completed && !t.status)).length;
-            const pending = validTasks.filter(t => t.status === 'pending' || (!t.status && !t.completed && t.priority !== 'high')).length;
-            const progress = validTasks.filter(t => t.status === 'progress' || (!t.status && !t.completed && t.priority === 'high')).length;
-            const failed = validTasks.filter(t => t.status === 'failed').length;
+            const completed = validTasks.filter(t => t.status === 'completed' || t.status === 'accepted' || (t.completed && !t.status)).length;
+            const pending = validTasks.filter(t => !t.status || t.status === 'pending').length;
+            const progress = validTasks.filter(t => ['claimed','progress','in_progress','delivered'].includes(t.status) || (!t.status && !t.completed && t.priority === 'high')).length;
             const total = validTasks.length;
             const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-            
+
             document.getElementById('stat-completed').textContent = completed;
             document.getElementById('stat-pending').textContent = pending;
             document.getElementById('stat-progress').textContent = progress;
             document.getElementById('stat-rate').textContent = `${rate}%`;
-            
             document.getElementById('health-percent').textContent = `${rate}%`;
             document.getElementById('health-fill').style.width = `${rate}%`;
         }
@@ -2227,6 +2626,8 @@
             if (e.key === 'Escape') {
                 closeNewTaskModal();
                 closeEditTaskModal();
+                closeDeliverModal();
+                closeRejectModal();
                 document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
             }
             if (e.ctrlKey && e.key === 'n') {
@@ -2561,7 +2962,11 @@
             const tbody = document.getElementById('tableBody');
             const ownerMap = {wangcai:'🐕 旺财', xianxiaoyu:'🐟 闲小鱼', shared:'🤝 共同'};
             const priorityMap = {P0:'🔴 P0', P1:'🟡 P1', P2:'🟢 P2'};
-            const statusMap = {pending:'⏳ 待处理', progress:'🔄 进行中', completed:'✅ 已完成', failed:'⚠️ 失败'};
+            const statusMap = {
+                pending:'⏳ 待处理', claimed:'🙋 已领取', progress:'🔄 进行中',
+                in_progress:'🔄 进行中', delivered:'📦 交付中', accepted:'✔️ 已验收',
+                completed:'✅ 已完成', failed:'⚠️ 失败', rejected:'❌ 已驳回'
+            };
 
             tbody.innerHTML = pageItems.map(task => {
                 const dueBadge = getDueBadge(task.dueDate) || (task.dueDate ? `<span class="due-badge normal">${task.dueDate}</span>` : '—');
@@ -2721,6 +3126,18 @@
         window.selectPriority = selectPriority;
         window.clearSearch = clearSearch;
         window.clearSelection = clearSelection;
+        // 新增生命周期函数
+        window.claimTask = claimTask;
+        window.startTask = startTask;
+        window.acceptTask = acceptTask;
+        window.openDeliverModal = openDeliverModal;
+        window.closeDeliverModal = closeDeliverModal;
+        window.submitDeliver = submitDeliver;
+        window.openRejectModal = openRejectModal;
+        window.closeRejectModal = closeRejectModal;
+        window.submitReject = submitReject;
+        window.toggleComments = toggleComments;
+        window.submitComment = submitComment;
     </script>
 </body>
 </html>
