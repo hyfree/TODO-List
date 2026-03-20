@@ -1,12 +1,9 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <h1>任务指挥中心</h1>
+      <h1 style="margin:0; font-size:17px; font-weight:700">任务指挥中心</h1>
     </header>
-
-    <main class="main">
-      <RouterView />
-    </main>
+    <RouterView />
   </div>
 </template>
 
