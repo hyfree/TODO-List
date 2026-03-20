@@ -1,0 +1,71 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f5f7f9;
+  color: #1a1a2e;
+}
+
+#app { min-height: 100vh; }
+
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.main { display: block; }
+.page { display: grid; gap: 12px; }
+
+.panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.project-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input, select, textarea, button {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+form {
+  display: grid;
+  gap: 8px;
+}
+
+button {
+  background: #667eea;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.task-table th, .task-table td {
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.error { color: #dc2626; }

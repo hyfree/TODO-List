@@ -1154,25 +1154,6 @@
     <div class="app-container">
         <!-- 侧边栏 -->
         <!-- 登录框 -->
-        <div id="loginOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
-            <div style="background:#fff;border-radius:16px;padding:32px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-                <div style="text-align:center;margin-bottom:24px;">
-                    <div style="font-size:2em;margin-bottom:8px;">🎯</div>
-                    <div style="font-size:1.25em;font-weight:700;color:#1A1A2E;">任务指挥中心</div>
-                    <div style="font-size:0.875em;color:#6B7280;margin-top:4px;">请登录以继续</div>
-                </div>
-                <div id="loginError" style="display:none;background:#FEE2E2;color:#DC2626;padding:10px 14px;border-radius:8px;font-size:0.875em;margin-bottom:16px;"></div>
-                <div style="margin-bottom:16px;">
-                    <label style="display:block;font-size:0.875em;font-weight:600;color:#374151;margin-bottom:6px;">用户名 (Owner)</label>
-                    <input id="loginOwner" type="text" placeholder="例如：wangcai" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:0.9em;outline:none;box-sizing:border-box;" />
-                </div>
-                <div style="margin-bottom:20px;">
-                    <label style="display:block;font-size:0.875em;font-weight:600;color:#374151;margin-bottom:6px;">已有 Token（可选）</label>
-                    <input id="loginToken" type="password" placeholder="留空则自动生成新 Token" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:0.9em;outline:none;box-sizing:border-box;" />
-                </div>
-                <button onclick="doLogin()" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:0.95em;font-weight:600;cursor:pointer;">🔑 登录 / 获取 Token</button>
-            </div>
-        </div>
 
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -1192,10 +1173,6 @@
                 <div class="nav-item" onclick="switchView('logs')" id="navLogs">
                     <span class="nav-icon">📝</span>
                     <span>操作日志</span>
-                </div>
-                <div class="nav-item" onclick="showTokenPanel()">
-                    <span class="nav-icon">⚙️</span>
-                    <span>账户 / Token</span>
                 </div>
             </nav>
             
@@ -1353,6 +1330,7 @@
                             <tr>
                                 <th style="width:36px"><input type="checkbox" id="selectAllChk" onchange="toggleSelectAll(this.checked)"></th>
                                 <th onclick="sortTable('title')">标题 <span class="sort-icon">↕</span></th>
+                                <th onclick="sortTable('project')">项目 <span class="sort-icon">↕</span></th>
                                 <th class="col-owner" onclick="sortTable('owner')">归属 <span class="sort-icon">↕</span></th>
                                 <th class="col-priority" onclick="sortTable('priority')">优先级 <span class="sort-icon">↕</span></th>
                                 <th onclick="sortTable('status')">状态 <span class="sort-icon">↕</span></th>
@@ -1572,6 +1550,10 @@
                 
                 <div class="form-row">
                     <div class="form-group">
+                        <label class="form-label">项目</label>
+                        <input type="text" class="form-input" id="taskProject" placeholder="例如：todo-web / narrative-engine">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">归属</label>
                         <select class="form-select" id="taskOwner">
                             <option value="xianxiaoyu">🐟 闲小鱼</option>
@@ -1666,6 +1648,10 @@
                 </div>
                 
                 <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">项目</label>
+                        <input type="text" class="form-input" id="editTaskProject" placeholder="例如：todo-web / narrative-engine">
+                    </div>
                     <div class="form-group">
                         <label class="form-label">归属</label>
                         <select class="form-select" id="editTaskOwner">
@@ -1765,6 +1751,15 @@
     
     <script>
         const API_BASE = window.location.protocol + '//' + window.location.host;
+
+        async function apiFetch(url, options = {}) {
+            const headers = Object.assign({}, options.headers || {});
+            if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+            return fetch(url, { ...options, headers });
+        }
+
         let selectedPriority = 'P1';
         let editSelectedPriority = 'P1';
         let currentEditTask = null;
@@ -1927,6 +1922,7 @@
         function resetForm() {
             document.getElementById('taskTitle').value = '';
             document.getElementById('taskDescription').value = '';
+            document.getElementById('taskProject').value = '';
             document.getElementById('taskStartDate').value = '';
             document.getElementById('taskDueDate').value = '';
             selectPriority('P1', document.querySelector('.priority-option.P1'));
@@ -1959,6 +1955,7 @@
             const task = {
                 title: title,
                 description: document.getElementById('taskDescription').value.trim(),
+                project: document.getElementById('taskProject').value.trim(),
                 priority: selectedPriority,
                 tag: document.getElementById('taskTag').value,
                 owner: document.getElementById('taskOwner').value,
@@ -2009,6 +2006,7 @@
             document.getElementById('editTaskId').value = task.id;
             document.getElementById('editTaskTitle').value = task.title;
             document.getElementById('editTaskDescription').value = task.description || '';
+            document.getElementById('editTaskProject').value = task.project || '';
             document.getElementById('editTaskTag').value = task.tag || '其他';
             document.getElementById('editTaskStartDate').value = task.startDate || '';
             document.getElementById('editTaskDueDate').value = task.dueDate || '';
@@ -2059,6 +2057,7 @@
                 id: currentEditTask.id,
                 title: title,
                 description: document.getElementById('editTaskDescription').value.trim(),
+                project: document.getElementById('editTaskProject').value.trim(),
                 priority: editSelectedPriority,
                 tag: document.getElementById('editTaskTag').value,
                 owner: document.getElementById('editTaskOwner').value,
@@ -2220,6 +2219,7 @@
                     <span class="priority-badge ${priority}">${getPriorityText(priority)}</span>
                     ${task.title}${dueBadge}${acceptanceBadge}${typeBadge}
                 </div>
+                ${task.project ? `<div class="task-description" style="margin-bottom:4px;color:#4B5563;">📁 ${task.project}</div>` : ''}
                 ${assigneeBadge ? `<div style="margin-bottom:4px">${assigneeBadge}</div>` : ''}
                 <div class="task-description">${(task.description || '').substring(0, 100)}${(task.description || '').length > 100 ? '...' : ''}</div>
                 ${deliverableSummary}
@@ -2996,6 +2996,7 @@
                 return `<tr class="${isSelected?'selected':''}" data-id="${task.id}">
                     <td><input type="checkbox" ${isSelected?'checked':''} onchange="toggleCardSelect('${task.id}',this.checked)" onclick="event.stopPropagation()"></td>
                     <td class="table-title-cell" onclick="openEditTaskById('${task.id}')" title="${(task.description||'').replace(/"/g,'&quot;')}">${task.title}</td>
+                    <td>${task.project || '—'}</td>
                     <td class="col-owner">${ownerMap[task.owner]||task.owner||'—'}</td>
                     <td class="col-priority">${priorityMap[task.priority]||task.priority||'—'}</td>
                     <td><span class="status-chip ${task.status||'pending'}">${statusMap[task.status]||task.status||'—'}</span></td>
@@ -3017,7 +3018,7 @@
                 if (icon) icon.textContent = '↕';
             });
             if (tableSort.field) {
-                const thMap = {title:1,owner:2,priority:3,status:4,tag:5,dueDate:6,createdAt:7};
+                const thMap = {title:1,project:2,owner:3,priority:4,status:5,tag:6,dueDate:7,createdAt:8};
                 const idx = thMap[tableSort.field];
                 if (idx) {
                     const th = document.querySelectorAll('.task-table th')[idx];
@@ -3159,211 +3160,6 @@
         window.submitReject = submitReject;
         window.toggleComments = toggleComments;
         window.submitComment = submitComment;
-        window.doLogin = doLogin;
-        window.showTokenPanel = showTokenPanel;
-        window.closeTokenPanel = closeTokenPanel;
-        window.copyToken = copyToken;
-        window.doLogout = doLogout;
-    </script>
-
-    <!-- Token 管理面板 -->
-    <div id="tokenPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;align-items:center;justify-content:center;">
-        <div style="background:#fff;border-radius:16px;padding:32px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:80vh;overflow-y:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
-                <div style="font-size:1.1em;font-weight:700;color:#1A1A2E;">⚙️ 账户 / Token 管理</div>
-                <button onclick="closeTokenPanel()" style="background:none;border:none;font-size:1.2em;cursor:pointer;color:#6B7280;">✕</button>
-            </div>
-            <div style="background:#F5F7F9;border-radius:10px;padding:16px;margin-bottom:20px;">
-                <div style="font-size:0.8em;color:#6B7280;margin-bottom:4px;">当前用户</div>
-                <div id="tpOwner" style="font-weight:600;font-size:1em;color:#1A1A2E;">—</div>
-            </div>
-            <div style="background:#F5F7F9;border-radius:10px;padding:16px;margin-bottom:20px;">
-                <div style="font-size:0.8em;color:#6B7280;margin-bottom:4px;">当前 Token（末4位）</div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <div id="tpTokenMask" style="font-family:monospace;font-size:1em;color:#1A1A2E;letter-spacing:2px;">****</div>
-                    <button onclick="copyToken()" style="padding:4px 12px;background:#667eea;color:#fff;border:none;border-radius:6px;font-size:0.8em;cursor:pointer;">复制</button>
-                </div>
-            </div>
-            <div id="tpTokenList" style="margin-bottom:20px;"></div>
-            <button onclick="doLogout()" style="width:100%;padding:11px;background:#EF4444;color:#fff;border:none;border-radius:8px;font-size:0.9em;font-weight:600;cursor:pointer;">🚪 注销登录</button>
-        </div>
-    </div>
-
-    <script>
-    // ── Token 认证模块 ────────────────────────────────────────────────────────
-    const LS_TOKEN = 'todo_api_token';
-    const LS_OWNER = 'todo_owner';
-    const LS_TOKEN_ID = 'todo_token_id';
-
-    function getStoredToken() { return localStorage.getItem(LS_TOKEN); }
-    function getStoredOwner() { return localStorage.getItem(LS_OWNER); }
-
-    // 封装 fetch，自动附加 Authorization 头，处理 401
-    async function apiFetch(url, options = {}) {
-        const token = getStoredToken();
-        const headers = Object.assign({}, options.headers || {});
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-        }
-        const res = await fetch(url, { ...options, headers });
-        if (res.status === 401) {
-            localStorage.removeItem(LS_TOKEN);
-            localStorage.removeItem(LS_OWNER);
-            localStorage.removeItem(LS_TOKEN_ID);
-            showLoginOverlay();
-            throw new Error('401 Unauthorized');
-        }
-        return res;
-    }
-
-    function showLoginOverlay() {
-        const el = document.getElementById('loginOverlay');
-        if (el) { el.style.display = 'flex'; }
-    }
-
-    function hideLoginOverlay() {
-        const el = document.getElementById('loginOverlay');
-        if (el) { el.style.display = 'none'; }
-    }
-
-    async function doLogin() {
-        const ownerEl = document.getElementById('loginOwner');
-        const tokenEl = document.getElementById('loginToken');
-        const errEl   = document.getElementById('loginError');
-        const owner = ownerEl.value.trim();
-        const manualToken = tokenEl.value.trim();
-
-        errEl.style.display = 'none';
-        if (!owner) { errEl.textContent = '请输入用户名'; errEl.style.display = 'block'; return; }
-
-        if (manualToken) {
-            // 直接使用已有 token，验证一下
-            try {
-                const res = await apiFetch(`${API_BASE}/api/tokens?owner=${encodeURIComponent(owner)}`, {
-                    headers: { 'Authorization': 'Bearer ' + manualToken }
-                });
-                if (res.status === 401) {
-                    errEl.textContent = 'Token 无效或已过期，请重新获取'; errEl.style.display = 'block'; return;
-                }
-                localStorage.setItem(LS_TOKEN, manualToken);
-                localStorage.setItem(LS_OWNER, owner);
-            } catch(e) {
-                errEl.textContent = '验证失败：' + e.message; errEl.style.display = 'block'; return;
-            }
-        } else {
-            // 创建新 token
-            try {
-                const res = await apiFetch(`${API_BASE}/api/tokens`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ owner })
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    errEl.textContent = data.error || '获取 Token 失败'; errEl.style.display = 'block'; return;
-                }
-                localStorage.setItem(LS_TOKEN, data.token.token);
-                localStorage.setItem(LS_OWNER, owner);
-                localStorage.setItem(LS_TOKEN_ID, data.token.id);
-            } catch(e) {
-                errEl.textContent = '网络错误：' + e.message; errEl.style.display = 'block'; return;
-            }
-        }
-
-        hideLoginOverlay();
-        updateOwnerLabel();
-        loadTasks && loadTasks();
-        loadTags && loadTags();
-    }
-
-    function updateOwnerLabel() {
-        const owner = getStoredOwner();
-        const el = document.getElementById('sidebarOwnerLabel');
-        if (el && owner) el.textContent = '👤 ' + owner;
-    }
-
-    function showTokenPanel() {
-        const owner = getStoredOwner() || '—';
-        const token = getStoredToken() || '';
-        document.getElementById('tpOwner').textContent = owner;
-        document.getElementById('tpTokenMask').textContent = token ? '••••••••' + token.slice(-4) : '未登录';
-        document.getElementById('tokenPanel').style.display = 'flex';
-        // 加载 token 列表
-        if (owner !== '—') loadTokenList(owner);
-    }
-
-    function closeTokenPanel() {
-        document.getElementById('tokenPanel').style.display = 'none';
-    }
-
-    async function loadTokenList(owner) {
-        const el = document.getElementById('tpTokenList');
-        try {
-            const res = await apiFetch(`${API_BASE}/api/tokens?owner=${encodeURIComponent(owner)}`);
-            const data = await res.json();
-            if (!data.success) { el.innerHTML = ''; return; }
-            el.innerHTML = '<div style="font-size:0.8em;color:#6B7280;margin-bottom:8px;">Token 列表</div>' +
-                data.tokens.map(t => `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F5F7F9;border-radius:8px;margin-bottom:6px;font-size:0.82em;">
-                        <div>
-                            <span style="font-family:monospace;color:#374151;">ID #${t.id}</span>
-                            <span style="margin-left:8px;color:${t.is_active ? '#10B981' : '#EF4444'};">${t.is_active ? '有效' : '已撤销'}</span>
-                            ${t.expires_at ? `<span style="margin-left:8px;color:#6B7280;">到期：${t.expires_at.slice(0,10)}</span>` : ''}
-                        </div>
-                        ${t.is_active ? `<button onclick="revokeToken(${t.id})" style="padding:3px 10px;background:#EF4444;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.85em;">撤销</button>` : ''}
-                    </div>`).join('');
-        } catch(e) { el.innerHTML = ''; }
-    }
-
-    async function revokeToken(tokenId) {
-        if (!confirm('确认撤销该 Token？')) return;
-        const currentId = parseInt(localStorage.getItem(LS_TOKEN_ID));
-        await apiFetch(`${API_BASE}/api/tokens/${tokenId}`, { method: 'DELETE' });
-        if (tokenId === currentId) {
-            doLogout();
-        } else {
-            loadTokenList(getStoredOwner());
-        }
-    }
-
-    function copyToken() {
-        const token = getStoredToken();
-        if (!token) return;
-        navigator.clipboard.writeText(token).then(() => {
-            showNotification && showNotification('Token 已复制到剪贴板', 'success');
-        });
-    }
-
-    async function doLogout() {
-        const tokenId = localStorage.getItem(LS_TOKEN_ID);
-        if (tokenId) {
-            try { await apiFetch(`${API_BASE}/api/tokens/${tokenId}`, { method: 'DELETE' }); } catch(_) {}
-        }
-        localStorage.removeItem(LS_TOKEN);
-        localStorage.removeItem(LS_OWNER);
-        localStorage.removeItem(LS_TOKEN_ID);
-        closeTokenPanel();
-        showLoginOverlay();
-    }
-
-    // 启动时检查 token
-    (function checkAuth() {
-        if (!getStoredToken()) {
-            // 延迟到 DOM 就绪后显示
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', showLoginOverlay);
-            } else {
-                showLoginOverlay();
-            }
-        } else {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', updateOwnerLabel);
-            } else {
-                updateOwnerLabel();
-            }
-        }
-    })();
     </script>
 </body>
 </html>
