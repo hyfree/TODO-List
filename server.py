@@ -798,8 +798,14 @@ async def request_logger(request: Request, call_next):
         logger.error("请求异常 %s %s: %s", request.method, request.url.path, e, exc_info=True)
         raise
 
+def _json_default(obj):
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
 def ok(data: dict, status_code: int = 200):
-    return JSONResponse(content=data, status_code=status_code)
+    import json as _json
+    return JSONResponse(content=_json.loads(_json.dumps(data, default=_json_default)), status_code=status_code)
 
 # ── 健康检查 ──────────────────────────────────────────────────────────────────
 
